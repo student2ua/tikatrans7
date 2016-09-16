@@ -1,6 +1,7 @@
 package com.ecwo.tikatrans;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.log4j.Logger;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
@@ -11,12 +12,15 @@ import javax.swing.*;
 import javax.swing.filechooser.FileSystemView;
 import java.io.*;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.Iterator;
 
 /**
  * Created by Admin on 12.08.2016.
  */
 public class TransferFolderToTXT {
+    public static final String[] EXTENSIONS = new String[]{"doc", "docx", "odt", "pdf"};
+    private static final Logger log = Logger.getLogger(TransferFolderToTXT.class);
     private static File dirIN;
 
     public static void main(String[] args) {
@@ -30,6 +34,8 @@ public class TransferFolderToTXT {
             if (selectedFile.isDirectory()) {
                 dirIN = selectedFile;
             } else JOptionPane.showMessageDialog(null, "Cancelled");
+            log.debug("select dir:" + dirIN);
+            log.debug("EXTENSIONS: " + Arrays.toString(EXTENSIONS));
             goTrans(dirIN, dirIN);
         }
     }
@@ -44,28 +50,30 @@ public class TransferFolderToTXT {
                         pathname.getName().endsWith(".pdf");
             }
         });*/
-        Iterator<File> iterateFiles = FileUtils.iterateFiles(dirIN, new String[]{"doc", "docx", "odt", "pdf"}, true);
+        Iterator<File> iterateFiles = FileUtils.iterateFiles(dirIN, EXTENSIONS, true);
         while (iterateFiles.hasNext()) {
             File file = iterateFiles.next();
-            System.out.println("file.getAbsolutePath() = " + file.getAbsolutePath());
+            log.info("file:" + file.getAbsolutePath());
             String fileName = file.getName();
-            System.out.println("file.getName() = " + fileName);
             try {
                 final String noExtFileName = fileName.substring(0, fileName.lastIndexOf("."));
                 File f = new File(file.getParent(), noExtFileName + ".txt");
-                if (f.exists()) {
+                if(f.exists()&&f.length()>100) continue;
+             /*   if (f.exists()) {
                     f = new File(file.getParent(), noExtFileName + "2.txt");
-                }
+                }*/
                 final String data = parseToPlainText(file.getAbsolutePath());
-                System.out.println("data.length() = " + data.length());
+                log.debug("data.length() = " + data.length());
 //                FileUtils.writeStringToFile(f, data, "UTF-8");
                 writeString2File(data, f);
             } catch (IOException e) {
-                e.printStackTrace();
+                log.error(e.toString(), e);
             } catch (SAXException e) {
-                e.printStackTrace();
+                log.error(e.toString(), e);
             } catch (TikaException e) {
-                e.printStackTrace();
+                log.warn(e.toString(), e);
+            } catch (java.lang.NoClassDefFoundError e) {
+                log.warn(e.toString(), e);
             }
 
         }
@@ -74,8 +82,8 @@ public class TransferFolderToTXT {
     private static String parseToPlainText(String sFile) throws IOException, SAXException, TikaException {
         BodyContentHandler handler = new BodyContentHandler(-1);
 
-        AutoDetectParser parser = new AutoDetectParser();
-        Metadata metadata = new Metadata();
+        final AutoDetectParser parser = new AutoDetectParser();
+        final Metadata metadata = new Metadata();
         InputStream stream = null;
         try {
             stream = new BufferedInputStream(new FileInputStream(sFile));
